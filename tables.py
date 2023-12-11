@@ -1,3 +1,6 @@
+from statement import Statement
+
+
 class StateTable:
     def __init__(self):
         self.__present_states = []
@@ -14,6 +17,9 @@ class StateTable:
 
     def get_output(self, state) -> list:
         return self.__output[state]
+
+    def get_states_count(self) -> int:
+        return len(self.__present_states)
 
     def row_match(self) -> None:
         matches = {0: 0}
@@ -61,11 +67,61 @@ class StateTable:
 
 
 class ImplicationTable:
-    def __init__(self):
+    def __init__(self, s_table):
         self.table = dict()
+        self.populate(s_table)
 
-    def set_condition(self, state: set, condition: set):
-        self.table[state] = condition
+    def set_condition(self, state: Statement, condition: Statement):
+        if self.table.get(state) is None:
+            self.table[state] = [condition]
+        else:
+            self.table[state].append(condition)
 
-    def get_condition(self, state: set) -> set:
+    def get_condition(self, state: Statement) -> StateTable:
         return self.table[state]
+
+    def print_table(self):
+        for key, values in self.table.items():
+            print(f"{key} -> ", end="")
+
+            for value in values:
+                print(f"{value} ", end="")
+
+            print()
+
+    def populate(self, s_table: StateTable):
+        states_count = s_table.get_states_count()
+
+        for i in range(states_count - 1):
+            for j in range(i, states_count):
+                if i == j:
+                    continue
+
+                i_next_states = s_table.get_next_states(i)
+                j_next_states = s_table.get_next_states(j)
+
+                i_outputs = s_table.get_output(i)
+                j_outputs = s_table.get_output(j)
+
+                state = Statement({i, j})
+                conditions = []
+
+                if i_outputs != j_outputs:
+                    condition = Statement(False)
+                    conditions.append(condition)
+                else:
+                    if i_next_states == j_next_states:
+                        condition = Statement(True)
+                        conditions.append(condition)
+                    else:
+                        for state1, state2 in zip(i_next_states, j_next_states):
+                            if state1 != state2:
+                                condition = Statement({state1, state2})
+
+                                if condition.equals(state):
+                                    condition.set_true()
+
+                                conditions.append(condition)
+
+                for condition in conditions:
+                    self.set_condition(state, condition)
