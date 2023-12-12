@@ -1,6 +1,3 @@
-from statement import Statement
-
-
 class StateTable:
     def __init__(self):
         self.__present_states = []
@@ -71,21 +68,33 @@ class ImplicationTable:
         self.table = dict()
         self.populate(s_table)
 
-    def set_condition(self, state: Statement, condition: Statement):
+    def set_condition(self, state: frozenset, condition: frozenset or bool):
         if self.table.get(state) is None:
             self.table[state] = [condition]
         else:
             self.table[state].append(condition)
 
-    def get_condition(self, state: Statement) -> StateTable:
-        return self.table[state]
+    def reset_condition(self, state: frozenset, condition: frozenset or bool):
+        self.table[state] = [condition]
+
+    def get_condition(self, state: frozenset) -> list[frozenset]:
+        return self.table.get(state)
 
     def print_table(self):
         for key, values in self.table.items():
-            print(f"{key} -> ", end="")
+            print("{ ", end="")
+            for x in key:
+                print(chr(ord('a') + x) + " ", end="")
+            print("} -> ", end="")
 
             for value in values:
-                print(f"{value} ", end="")
+                if isinstance(value, frozenset):
+                    print("{ ", end="")
+                    for x in value:
+                        print(chr(ord('a') + x) + " ", end="")
+                    print("}", end="")
+                else:
+                    print(f"{value} ", end="")
 
             print()
 
@@ -93,35 +102,51 @@ class ImplicationTable:
         states_count = s_table.get_states_count()
 
         for i in range(states_count - 1):
-            for j in range(i, states_count):
-                if i == j:
-                    continue
-
+            for j in range(i + 1, states_count):
                 i_next_states = s_table.get_next_states(i)
                 j_next_states = s_table.get_next_states(j)
 
                 i_outputs = s_table.get_output(i)
                 j_outputs = s_table.get_output(j)
 
-                state = Statement({i, j})
+                state = frozenset({i, j})
                 conditions = []
 
                 if i_outputs != j_outputs:
-                    condition = Statement(False)
+                    condition = False
                     conditions.append(condition)
                 else:
                     if i_next_states == j_next_states:
-                        condition = Statement(True)
+                        condition = True
                         conditions.append(condition)
                     else:
                         for state1, state2 in zip(i_next_states, j_next_states):
                             if state1 != state2:
-                                condition = Statement({state1, state2})
+                                condition = frozenset({state1, state2})
 
-                                if condition.equals(state):
-                                    condition.set_true()
+                                if condition != state:
+                                    conditions.append(condition)
 
-                                conditions.append(condition)
+                if len(conditions) == 0:
+                    self.set_condition(state, True)
+                else:
+                    for condition in conditions:
+                        self.set_condition(state, condition)
 
+    def imply(self):
+        reduced = True
+
+        while reduced:
+            reduced = False
+            for state, conditions in self.table.items():
                 for condition in conditions:
-                    self.set_condition(state, condition)
+                    if isinstance(condition, frozenset):
+                        transitive_conditions = self.get_condition(condition)
+
+                        if transitive_conditions is not None and \
+                            len(transitive_conditions) == 1 and \
+                                transitive_conditions[0] == False:
+
+                            self.reset_condition(state, False)
+                            reduced = True
+                            break
