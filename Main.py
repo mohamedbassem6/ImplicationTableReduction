@@ -68,3 +68,6 @@ i_table.imply()
 
 print("IMPLICATION TABLE AFTER REDUCTION:")
 i_table.print_table()
+
+print("REMAINING STATES:")
+print(i_table.get_remaining_states())

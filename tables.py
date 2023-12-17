@@ -65,64 +65,95 @@ class StateTable:
 
 class ImplicationTable:
     def __init__(self, s_table):
-        self.table = dict()
-        self.populate(s_table)
+        self.state_table = s_table
+        self.states_count = s_table.get_states_count()
+        self.table = [[[] for _ in range(self.states_count)] for _ in range(self.states_count)]
+        self.populate()
 
-    def set_condition(self, state: frozenset, condition: frozenset or bool):
-        if self.table.get(state) is None:
-            self.table[state] = [condition]
-        else:
-            self.table[state].append(condition)
+    def set_condition(self, state: set, condition: set or bool):
+        row = max(state)
+        col = min(state)
 
-    def reset_condition(self, state: frozenset, condition: frozenset or bool):
-        self.table[state] = [condition]
+        self.table[row][col].append(condition)
 
-    def get_condition(self, state: frozenset) -> list[frozenset]:
-        return self.table.get(state)
+    def reset_condition(self, state: set, condition: set or bool):
+        row = max(state)
+        col = min(state)
+
+        self.table[row][col] = [condition]
+
+    def get_conditions(self, state: set) -> list[bool or set]:
+        row = max(state)
+        col = min(state)
+
+        return self.table[row][col]
+
+    def get_remaining_states(self) -> list:
+        remaining_states = []
+
+        for i in range(self.states_count):
+            for j in range(self.states_count):
+                if i > j and self.table[i][j][0] != False:
+                    remaining_states.append({i, j})
+
+        return remaining_states
 
     def print_table(self):
-        for key, values in self.table.items():
-            print("{ ", end="")
-            for x in key:
-                print(chr(ord('a') + x) + " ", end="")
-            print("} -> ", end="")
+        for i in range(self.states_count):
+            if i > 0:
+                print(chr(ord('A') + i), end="\t\t\t")
 
-            for value in values:
-                if isinstance(value, frozenset):
-                    print("{ ", end="")
-                    for x in value:
-                        print(chr(ord('a') + x) + " ", end="")
-                    print("}", end="")
-                else:
-                    print(f"{value} ", end="")
+            for j in range(self.states_count):
+                if i > j:
+                    conditions = self.get_conditions({i, j})
 
-            print()
+                    count = 0
+                    for condition in conditions:
+                        if isinstance(condition, bool):
+                            print(f"{condition}", end=" ")
+                        else:
+                            count += 1
+                            print(f"{chr(ord('A') + max(condition))}-{chr(ord('A') + min(condition))}", end=" ")
 
-    def populate(self, s_table: StateTable):
-        states_count = s_table.get_states_count()
+                    if count == 2:
+                        print("\t\t", end="")
+                    else:
+                        print("\t\t\t", end="")
 
-        for i in range(states_count - 1):
-            for j in range(i + 1, states_count):
-                i_next_states = s_table.get_next_states(i)
-                j_next_states = s_table.get_next_states(j)
+            print("\n")
 
-                i_outputs = s_table.get_output(i)
-                j_outputs = s_table.get_output(j)
+        print("\t\t\t", end="")
+        for i in range(self.states_count - 1):
+            print(chr(ord('A') + i), end="\t\t\t\t")
 
-                state = frozenset({i, j})
+        print("\n")
+
+    def populate(self):
+        for i in range(self.states_count - 1):
+            for j in range(i + 1, self.states_count):
+                i_next_states = self.state_table.get_next_states(i)
+                j_next_states = self.state_table.get_next_states(j)
+
+                i_outputs = self.state_table.get_output(i)
+                j_outputs = self.state_table.get_output(j)
+
+                state = {i, j}
                 conditions = []
 
+                # If the 2 states have different o/p, then they're not equivalent
                 if i_outputs != j_outputs:
                     condition = False
                     conditions.append(condition)
                 else:
+                    # If the 2 states have the same next states, then they're equivalent
                     if i_next_states == j_next_states:
                         condition = True
                         conditions.append(condition)
+                    # If the 2 states have different next states, then add the condition
                     else:
                         for state1, state2 in zip(i_next_states, j_next_states):
                             if state1 != state2:
-                                condition = frozenset({state1, state2})
+                                condition = {state1, state2}
 
                                 if condition != state:
                                     conditions.append(condition)
@@ -138,13 +169,12 @@ class ImplicationTable:
 
         while reduced:
             reduced = False
-            for state, conditions in self.table.items():
-                for condition in conditions:
-                    if isinstance(condition, frozenset):
-                        transitive_conditions = self.get_condition(condition)
+            for state in self.get_remaining_states():
+                for condition in self.get_conditions(state):
+                    if isinstance(condition, set):
+                        transitive_conditions = self.get_conditions(condition)
 
-                        if transitive_conditions is not None and \
-                            len(transitive_conditions) == 1 and \
+                        if len(transitive_conditions) == 1 and \
                                 transitive_conditions[0] == False:
 
                             self.reset_condition(state, False)
