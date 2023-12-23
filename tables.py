@@ -4,6 +4,20 @@ class StateTable:
         self.__next_states = []
         self.__output = []
 
+    def __copy__(self):
+        new_table = StateTable()
+
+        states_dict = dict()
+
+        for i in range(len(self.__present_states)):
+            states_dict[self.__present_states[i]] = i
+
+        new_table.__present_states = [i for i in range(len(self.__present_states))]
+        new_table.__next_states = [[states_dict[x] for x in next_states] for next_states in self.__next_states]
+        new_table.__output = self.__output.copy()
+
+        return new_table
+
     def add(self, next_state: list, output: list):
         self.__present_states.append(len(self.__present_states))
         self.__next_states.append(next_state)
@@ -17,6 +31,15 @@ class StateTable:
 
     def get_states_count(self) -> int:
         return len(self.__present_states)
+
+    def get_table_as_list(self) -> list[list]:
+        table = []
+
+        for i in range(len(self.__present_states)):
+            row = self.get_next_states(i) + self.get_output(i)
+            table.append(row)
+
+        return table
 
     def row_match(self) -> None:
         matches = {0: 0}
@@ -65,7 +88,7 @@ class StateTable:
 
 class ImplicationTable:
     def __init__(self, s_table):
-        self.state_table = s_table
+        self.state_table = s_table.__copy__()
         self.states_count = s_table.get_states_count()
         self.table = [[[] for _ in range(self.states_count)] for _ in range(self.states_count)]
         self.populate()
@@ -91,12 +114,31 @@ class ImplicationTable:
     def get_remaining_states(self) -> list:
         remaining_states = []
 
-        for i in range(self.states_count):
-            for j in range(self.states_count):
-                if i > j and self.table[i][j][0] != False:
+        for i in range(self.states_count - 1):
+            for j in range(i + 1, self.states_count):
+                conditions = self.get_conditions({i, j})
+                if len(conditions) != 0 and conditions[0] != False:
                     remaining_states.append({i, j})
 
         return remaining_states
+
+    def get_empty_states(self) -> list:
+        empty_states = []
+
+        for i in range(self.states_count - 1):
+            found = False
+
+            for j in range(i + 1, self.states_count):
+                conditions = self.get_conditions({i, j})
+
+                if len(conditions) != 0 and conditions[0] != False:
+                    found = True
+                    break
+
+            if not found:
+                empty_states.append({i})
+
+        return empty_states
 
     def print_table(self):
         for i in range(self.states_count):
@@ -180,3 +222,37 @@ class ImplicationTable:
                             self.reset_condition(state, False)
                             reduced = True
                             break
+
+    def classify(self) -> list[set]:
+        classes = self.get_remaining_states()
+
+        classes += self.get_empty_states()
+
+        for i in range(len(classes) - 1):
+            for j in range(i + 1, len(classes)):
+                if not classes[i].isdisjoint(classes[j]):
+                    classes[i].update(classes[i].union(classes[j]))
+                    classes[j].clear()
+
+        while set() in classes:
+            classes.remove(set())
+
+        return classes
+
+    def get_reduced_table(self, classes: list[set]) -> StateTable:
+        classes_map = dict()
+
+        for i in range(len(classes)):
+            for element in list(classes[i]):
+                classes_map[element] = i
+
+        reduced_table = StateTable()
+
+        for c in classes:
+            element = next(iter(c))
+            next_states = [classes_map[state] for state in self.state_table.get_next_states(element)]
+            outputs = self.state_table.get_output(element)
+
+            reduced_table.add(next_states, outputs)
+
+        return reduced_table
